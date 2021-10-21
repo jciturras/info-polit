@@ -329,6 +329,7 @@ sjPlot::plot_model(model = glmer3,type = "re",
 ## Redes sociales
 
 ```{r inter-redes}
+omit.coef="((Intercept))|(region)|(zona_u_r)"
 glm1<- glm(redes_d~lvl+edad_cat+mujer+tpos+region+zona_u_r+as.numeric(encuesta_a)+tele_d+noticias_d,
            data = df_study1,family = "binomial")
 
