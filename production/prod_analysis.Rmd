@@ -13,10 +13,15 @@ editor_options:
   chunk_output_type: console
 ---
 
+```{r eval=FALSE, include=FALSE}
+rmarkdown::render("production/prod_analysis.Rmd")
+```
+
+
 # Setup
 
 ```{r setup}
-knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, results = 'asis')
 options(scipen=9999) # desactivar notacion cientifica
 ```
 
@@ -49,123 +54,56 @@ pacman::p_load(dplyr,       # Manipulacion de datos
                knitr,       # tablas kable
                kableExtra,  # tablas kable personalizadas
                ggplot2,     # plots
+               lme4,
+               estimatr
                )
 ```
 
 ## Datos
 ```{r}
-load(file = "../input/data/proc/df_final.Rdata" )
+load(file = "../input/data/proc/df_study1.Rdata")
 ```
 
 # Análisis
 
-## Descriptivos 
-
-```{r tabla_datos_gráfico, echo=TRUE}
-#Ejemplo: [VARIABLE = conf_presi] y [VAR_Z = ola]
-a <- data.frame((table(df_final$estatus,df_final$ola)))
-b <- a %>% group_by(Var2) %>% 
-  transmute(porcentaje=Freq/sum(Freq)) %>% 
-  rename(ola=Var2)
-b$ola <- NULL
-datos.grafico<- cbind(a,b)
-```
-
-```{r bar_x_categoría, echo=TRUE}
-#Nombrar el gráfico (c.1.1) y seleccionar datos (datos.grafico)
-c.1.1 <-datos.grafico %>% 
-    #indicar el contenido del gráfico: ejes y relleno (fill) por ola
-    ggplot(aes(y = porcentaje, x = Var1, fill = Var2, 
-               label = as.character(scales::percent(porcentaje, accuracy = .1)))) +
-    #fijar el fondo y el marco del gráfico uniforme
-    theme_bw() + 
-    #geom_col para usar variable y=porcentaje. 'dodge2' para formato side-to-side
-    geom_col(position= 'dodge2') +
-    #escala del eje y en porcentajes del 0 al 100%
-    scale_y_continuous(labels = scales::percent,
-                       limits = c(0, 1)) +
-    #Nombres de los ejes se eliminan
-    ylab(label = NULL) +
-    xlab(label = NULL) +
-    #colores oficiales por ola: degradé 'viridis'
-    scale_fill_viridis_d(begin = .33, end = .66, direction = -1, option = 'viridis') +
-    #etiquetas por sobre cada barra
-    geom_text(vjust = -0.8,
-              position = position_dodge(width = .9),
-              size= 2.75) +
-    #posicionamiento de leyenda arriba
-    theme(legend.position = 'top',
-          legend.title = element_blank()) +
-    #titulo del gráfico
-    ggtitle('Estatus Social Subjetivo según año')
-
-c.1.1
-ggsave(c.1.1,filename = "freq_ess.png",device = "png",path = "../output/images/")
-```
-
-```{r}
-#Paso 1
-a1 <- data.frame(table(df_final$estatus,df_final$ola,df_final$idencuesta))
-a1 <- a1 %>% dplyr::filter(Freq>0)
-a2 <- a1 %>% group_by(Var2) %>% transmute(porcentaje=Freq/sum(Freq)) 
-a2$Var2 <- NULL
-datos.d.1<- cbind(a1,a2)
-datos.d.1 <- na.omit(datos.d.1)
-
-#Paso 2
-b1 <- data.frame(table(df_final$estatus,df_final$ola))
-b2 <- b1 %>% 
-  group_by(Var2) %>% 
-  transmute(porcentaje=Freq/sum(Freq)) %>% 
-  mutate(idencuesta = 1)
-b2$Var2 <- NULL
-etiquetas.d.1<- cbind(b1,b2)
-etiquetas.d.1 <- na.omit(etiquetas.d.1)
-```
-
-```{r gráfíco alluvial .d.1: idcoal 4 olas}
-d.1 <- ggplot(datos.d.1, aes(x = Var2, fill = Var1, stratum = Var1,
-                             alluvium = Var3, y = porcentaje))+
-    ggalluvial::geom_flow(alpha = .66) + 
-    ggalluvial::geom_stratum(linetype = 0) +
-    scale_y_continuous(labels = scales::percent) + 
-    ylab(label = NULL) +
-    xlab(label = NULL) + 
-    theme(legend.position = 'top',
-          legend.title = element_blank()) +
-    scale_fill_viridis_d(begin = 0, end = .85, direction = -1, option = 'viridis') +
-  ggtitle('Cambio de frecuencias de Estatus Subjetivo según año')
-
-d.1
-ggsave(d.1,filename = "alluv_ess.png",device = "png",path = "../output/images/")
-```
-
-## Estimaciones - modelos
+## Modelos lineales
 
 ```{r results='asis'}
-m1 <- lm(ess~sexo,data = df_final)
-m2 <- lm(ess~sexo+edad,data = df_final)
-m3 <- lm(ess~sexo+edad+educacion,data = df_final)
-m4 <- lm(ess~sexo+edad+educacion+ola,data = df_final)
+rob1<- lm_robust(media_fs~lvl+edad_cat+mujer+tpos+region+zona_u_r+encuesta_a,data = df_study1)
+rob2<- lm_robust(media_fs~lvl+edad_cat+mujer+tpos+region+zona_u_r,data = df_study1,fixed_effects = encuesta_a)
 
-cap <- "Modelos de regresión para autos y sus partes." # Titulo de tabla
-custom.coef.names = c( # Custom names para coeficientes:                                                     
-  "Intercepto",
-  "Sexo: mujer",
+ml0 <- lmer(media_fs~1+(1|encuesta_a),data = df_study1)
+ml1 <- lmer(media_fs~lvl+edad_cat+mujer+tpos+region+zona_u_r+(1|encuesta_a),data = df_study1)
+ml2 <- lmer(media_fs~lvl+edad_cat+mujer+tpos+region+zona_u_r+(1+lvl|encuesta_a),data = df_study1)
+ml3 <- lmer(media_fs~educ+edad_cat+mujer+tpos+region+zona_u_r+(1+educ|encuesta_a),data = df_study1)
+
+cap <- "Modelos de regresión con efectos fijos y multinivel para consumo de información política general" # Titulo de tabla
+custom.coef.names = c( # Custom names para coeficientes:
+  "Media",
+  "Técnico-profesional",
+  "Univesitaria",
   "30-49",
   "50-64",
   "65 o más",
-  "Media",
-  "Técnica",
-  "Universitaria",
-  "2017",
-  "2018",
-  "2019"
+  "Sexo: mujer",
+  "Tiene pos. política (ref: no tiene)",
+  "Encuesta: 2012",
+  "Encuesta: 2013",
+  "Encuesta: 2014",
+  "Encuesta: 2015",
+  "Encuesta: 2016",
+  "Encuesta: 2017",
+  "Encuesta: 2018",
+  "Encuesta: 2019",
+  "Años de educación"
   )
 # Custom footnote de tabla: 
 custom.note = "$^{***}$p < 0,001;$^{**}$p < 0,01;$^{*}$p < 0,05"
+omit.coef="((Intercept))|(region)|(zona_u_r)"
 # texreg::knitreg() decide si usar formato tabla html o latex según corresponda. 
-texreg::knitreg(list(m1,m2,m3,m4),                     # Modelos 1, 2, 3 y 4
+texreg::knitreg(list(rob1,rob2,ml1,ml2,ml3),
+                omit.coef = omit.coef,
+                include.ci = FALSE,
                 caption = cap,                          # Titulo
                 caption.above = T,                      # Titulo de tabla arriba
                 custom.coef.names = custom.coef.names,  # Definir custom names para coeficientes
@@ -173,7 +111,339 @@ texreg::knitreg(list(m1,m2,m3,m4),                     # Modelos 1, 2, 3 y 4
                 booktabs = TRUE,                        # Usar líneas horizontales en tabla
                 scalebox = 0.75,                        # tamaño de tabla a .75
                 float.pos = "hp!"
-)                        
+                )                        
+```
+
+* Primero, modelo 1 muestra que empleando la ola de la encuesta como predictor, desde 2012 hasta 2016 el consumo de información política general incrementa. Luego, en 2017 se estanca y no muestra diferencias estadísticamente significativas. Estimando a través de FE, los resultados son idénticos.
+
+* Educación en tramos mantiene su relación positiva y estadísticamente singificativa en todas las especificaciones (ols, FE y multinivel)
+
+* El modelo 3, 4 y 5 muestran las estimaciones usando modelos de intercepto (M3) aleatorio y pendiente aleatoria para educación (Modelos 4 y 5). Los modelos muestran que la pendiente de educación no varía significativamente entre años. 
+
+```{r, fig.width=12, fig.height=5}
+sjPlot::plot_model(model = ml2,type = "re",title = "Random slope nivel educacional")
+sjPlot::plot_model(model = ml3,type = "re",title = "Random slope años de educación")
+```
+
+## Modelos logit 
+
+```{r redes, results='asis', cache=TRUE}
+# Modelos para redes (binary)
+glm1<- glm(redes_d~lvl+edad_cat+mujer+tpos+region+zona_u_r+encuesta_a+tele_d,
+           data = df_study1,family = "binomial")
+glmer0 <- glmer(redes_d~1+(1|encuesta_a),
+                data = df_study1,family = "binomial",nAGQ = 10)
+glmer1 <- glmer(redes_d~lvl+edad_cat+mujer+tpos+region+zona_u_r +tele_d+noticias_d+(1|encuesta_a),
+                data = df_study1,family = "binomial",nAGQ = 10)
+glmer2 <- glmer(redes_d~lvl+edad_cat+mujer+tpos+region+zona_u_r +tele_d+noticias_d+(1+lvl|encuesta_a),
+                data = df_study1,family = "binomial")
+glmer3 <- glmer(redes_d~educ+edad_cat+mujer+tpos+region+zona_u_r+tele_d+noticias_d+(1+educ|encuesta_a),
+                data = df_study1,family = "binomial")
+
+cap <- "Modelos de regresión logit y logit multinivel para consumo de información política en Redes Sociales" # Titulo de tabla
+custom.coef.names = c( # Custom names para coeficientes:
+  "Media",
+  "Técnico-profesional",
+  "Univesitaria",
+  "30-49",
+  "50-64",
+  "65 o más",
+  "Sexo: mujer",
+  "Tiene pos. política (ref: no tiene)",
+  "Encuesta: 2012",
+  "Encuesta: 2013",
+  "Encuesta: 2014",
+  "Encuesta: 2015",
+  "Encuesta: 2016",
+  "Encuesta: 2017",
+  "Encuesta: 2018",
+  "Encuesta: 2019",
+  "Años de educación"
+  )
+
+# Custom footnote de tabla: 
+custom.note = "$^{***}$p < 0,001;$^{**}$p < 0,01;$^{*}$p < 0,05"
+omit.coef="((Intercept))|(region)|(zona_u_r)|(tele_d)|(noticias_d)"
+# texreg::knitreg() decide si usar formato tabla html o latex según corresponda. 
+texreg::knitreg(list(glm1,glmer1,glmer2,glmer3),
+                omit.coef = omit.coef,
+                include.ci = FALSE,
+                caption = cap,                          # Titulo
+                caption.above = T,                      # Titulo de tabla arriba
+                custom.coef.names = custom.coef.names,  # Definir custom names para coeficientes
+                custom.note = custom.note,              # Definir footnote de tabla
+                booktabs = TRUE,                        # Usar líneas horizontales en tabla
+                scalebox = 0.75,                        # tamaño de tabla a .75
+                float.pos = "hp!"
+                )                        
+```
+
+```{r}
+anova(glmer1,glmer2) %>% 
+  broom::tidy() %>% 
+  knitr::kable() %>% 
+  kableExtra::kable_classic()
+```
+
+```{r, fig.width=12, fig.height=5}
+sjPlot::plot_model(model = glmer2,type = "re",
+                   title = "Redes: Random slope nivel educacional")
+sjPlot::plot_model(model = glmer3,type = "re",
+                   title = "Redes: Random slope años de educación")
+```
+
+```{r tele, results='asis', cache=T}
+# Modelos para ve television (binary)
+glm1<- glm(tele_d~lvl+edad_cat+mujer+tpos+region+zona_u_r+encuesta_a+redes_d+noticias_d,
+           data = df_study1,family = "binomial")
+glmer0 <- glmer(tele_d~1+(1|encuesta_a),
+                data = df_study1,family = "binomial",nAGQ = 10)
+glmer1 <- glmer(tele_d~lvl+edad_cat+mujer+tpos+region+zona_u_r+redes_d+noticias_d+(1|encuesta_a),
+                data = df_study1,family = "binomial",nAGQ = 10)
+glmer2 <- glmer(tele_d~lvl+edad_cat+mujer+tpos+region+zona_u_r+redes_d+noticias_d+(1+lvl|encuesta_a),
+                data = df_study1,family = "binomial")
+glmer3 <- glmer(tele_d~educ+edad_cat+mujer+tpos+region+zona_u_r+redes_d+noticias_d+(1+educ|encuesta_a),
+                data = df_study1,family = "binomial")
+
+cap <- "Modelos de regresión logit y logit multinivel para consumo de información política en Televisión" # Titulo de tabla
+custom.coef.names = c( # Custom names para coeficientes:
+  "Media",
+  "Técnico-profesional",
+  "Univesitaria",
+  "30-49",
+  "50-64",
+  "65 o más",
+  "Sexo: mujer",
+  "Tiene pos. política (ref: no tiene)",
+  "Encuesta: 2012",
+  "Encuesta: 2013",
+  "Encuesta: 2014",
+  "Encuesta: 2015",
+  "Encuesta: 2016",
+  "Encuesta: 2017",
+  "Encuesta: 2018",
+  "Encuesta: 2019",
+  "Años de educación"
+  )
+
+# Custom footnote de tabla: 
+custom.note = "$^{***}$p < 0,001;$^{**}$p < 0,01;$^{*}$p < 0,05"
+omit.coef="((Intercept))|(region)|(zona_u_r)|(redes_d)|(noticias_d)"
+# texreg::knitreg() decide si usar formato tabla html o latex según corresponda. 
+texreg::knitreg(list(glm1,glmer1,glmer2,glmer3),
+                omit.coef = omit.coef,
+                include.ci = FALSE,
+                caption = cap,                          # Titulo
+                caption.above = T,                      # Titulo de tabla arriba
+                custom.coef.names = custom.coef.names,  # Definir custom names para coeficientes
+                custom.note = custom.note,              # Definir footnote de tabla
+                booktabs = TRUE,                        # Usar líneas horizontales en tabla
+                scalebox = 0.75,                        # tamaño de tabla a .75
+                float.pos = "hp!"
+                )                        
+```
+
+```{r}
+anova(glmer1,glmer2) %>%
+  broom::tidy() %>% 
+  knitr::kable() %>% 
+  kableExtra::kable_classic()
+```
+
+```{r, fig.width=12, fig.height=5}
+sjPlot::plot_model(model = glmer2,type = "re",
+                   title = "Televisión: Random slope nivel educacional")
+sjPlot::plot_model(model = glmer3,type = "re",
+                   title = "Televisión: Random slope años de educación")
+```
+
+```{r noticias, results='asis', cache=T}
+# Modelos para lee noticias (binary)
+glm1<- glm(noticias_d~lvl+edad_cat+mujer+tpos+region+zona_u_r+encuesta_a+redes_d+tele_d,
+           data = df_study1,family = "binomial")
+glmer0 <- glmer(noticias_d~1+(1|encuesta_a),
+                data = df_study1,family = "binomial",nAGQ = 10)
+glmer1 <- glmer(noticias_d~lvl+edad_cat+mujer+tpos+region+zona_u_r+redes_d+tele_d+(1|encuesta_a),
+                data = df_study1,family = "binomial",nAGQ = 10)
+glmer2 <- glmer(noticias_d~lvl+edad_cat+mujer+tpos+region+zona_u_r+redes_d+tele_d+(1+lvl|encuesta_a),
+                data = df_study1,family = "binomial")
+glmer3 <- glmer(noticias_d~educ+edad_cat+mujer+tpos+region+zona_u_r+redes_d+tele_d+(1+educ|encuesta_a),
+                data = df_study1,family = "binomial")
+
+cap <- "Modelos de regresión logit y logit multinivel para consumo de información política Lectura de noticias" # Titulo de tabla
+custom.coef.names = c( # Custom names para coeficientes:
+  "Media",
+  "Técnico-profesional",
+  "Univesitaria",
+  "30-49",
+  "50-64",
+  "65 o más",
+  "Sexo: mujer",
+  "Tiene pos. política (ref: no tiene)",
+  "Encuesta: 2012",
+  "Encuesta: 2013",
+  "Encuesta: 2014",
+  "Encuesta: 2015",
+  "Encuesta: 2016",
+  "Encuesta: 2017",
+  "Encuesta: 2018",
+  "Encuesta: 2019",
+  "Años de educación"
+  )
+
+
+# Custom footnote de tabla: 
+custom.note = "$^{***}$p < 0,001;$^{**}$p < 0,01;$^{*}$p < 0,05"
+omit.coef="((Intercept))|(region)|(zona_u_r)|(redes_d)|(tele_d)"
+# texreg::knitreg() decide si usar formato tabla html o latex según corresponda. 
+texreg::knitreg(list(glm1,glmer1,glmer2,glmer3),
+                omit.coef = omit.coef,
+                include.ci = FALSE,
+                caption = cap,                          # Titulo
+                caption.above = T,                      # Titulo de tabla arriba
+                custom.coef.names = custom.coef.names,  # Definir custom names para coeficientes
+                custom.note = custom.note,              # Definir footnote de tabla
+                booktabs = TRUE,                        # Usar líneas horizontales en tabla
+                scalebox = 0.75,                        # tamaño de tabla a .75
+                float.pos = "hp!"
+                )                        
+```
+
+```{r}
+anova(glmer1,glmer2) %>% 
+    broom::tidy() %>% 
+    knitr::kable() %>% 
+  kableExtra::kable_classic()
+```
+
+```{r, fig.width=12, fig.height=5}
+sjPlot::plot_model(model = glmer2,type = "re",
+                   title = "Noticias: Random slope nivel educacional")
+sjPlot::plot_model(model = glmer3,type = "re",
+                   title = "Noticias: Random slope años de educación")
+```
+
+
+# Interacciones
+
+## Redes sociales
+
+```{r inter-redes}
+glm1<- glm(redes_d~lvl+edad_cat+mujer+tpos+region+zona_u_r+as.numeric(encuesta_a)+tele_d+noticias_d,
+           data = df_study1,family = "binomial")
+
+redes_ed_year <- 
+  glm(redes_d~lvl*as.numeric(encuesta_a)+edad_cat+mujer+tpos+region+zona_u_r+as.numeric(encuesta_a)+tele_d+noticias_d,
+      data = df_study1,family = "binomial")
+
+redes_age_year <- 
+  glm(redes_d~lvl+edad_cat*as.numeric(encuesta_a)+mujer+tpos+region+zona_u_r+as.numeric(encuesta_a)+tele_d+noticias_d,
+      data = df_study1,family = "binomial")
+
+redes_sex_year <- 
+  glm(redes_d~lvl+edad_cat+mujer*as.numeric(encuesta_a)+tpos+region+zona_u_r+as.numeric(encuesta_a)+tele_d+noticias_d,
+      data = df_study1,family = "binomial")
+
+redes_tpos_year <- 
+  glm(redes_d~lvl+edad_cat+mujer+tpos*as.numeric(encuesta_a)+region+zona_u_r+as.numeric(encuesta_a)+tele_d+noticias_d,
+      data = df_study1,family = "binomial")
+
+
+
+texreg::knitreg(list(glm1,
+                       redes_ed_year,
+                       redes_age_year,
+                       redes_sex_year,
+                       redes_tpos_year), 
+                  omit.coef = omit.coef)
+```
+
+```{r, fig.width=8, fig.height=6}
+texreg::plotreg(l = list(redes_ed_year,
+                         redes_age_year,
+                         redes_sex_year,
+                         redes_tpos_year), 
+                omit.coef = omit.coef)
+```
+
+## Televisión
+
+```{r inter-tele}
+glm1<- glm(tele_d~lvl+edad_cat+mujer+tpos+region+zona_u_r+as.numeric(encuesta_a)+redes_d+noticias_d,
+           data = df_study1,family = "binomial")
+
+tele_ed_year <- 
+  glm(tele_d~lvl*as.numeric(encuesta_a)+edad_cat+mujer+tpos+region+zona_u_r+as.numeric(encuesta_a)+redes_d+noticias_d,
+      data = df_study1,family = "binomial")
+
+tele_age_year <- 
+  glm(tele_d~lvl+edad_cat*as.numeric(encuesta_a)+mujer+tpos+region+zona_u_r+as.numeric(encuesta_a)+redes_d+noticias_d,
+      data = df_study1,family = "binomial")
+
+tele_sex_year <- 
+  glm(tele_d~lvl+edad_cat+mujer*as.numeric(encuesta_a)+tpos+region+zona_u_r+as.numeric(encuesta_a)+redes_d+noticias_d,
+      data = df_study1,family = "binomial")
+
+tele_tpos_year <- 
+  glm(tele_d~lvl+edad_cat+mujer+tpos*as.numeric(encuesta_a)+region+zona_u_r+as.numeric(encuesta_a)+redes_d+noticias_d,
+      data = df_study1,family = "binomial")
+
+
+
+texreg::knitreg(list(glm1,
+                       tele_ed_year,
+                       tele_age_year,
+                       tele_sex_year,
+                       tele_tpos_year), 
+                  omit.coef = omit.coef)
+```
+
+```{r, fig.width=8, fig.height=6}
+texreg::plotreg(l = list(tele_ed_year,
+                         tele_age_year,
+                         tele_sex_year,
+                         tele_tpos_year), 
+                omit.coef = omit.coef)
+```
+
+
+## Noticias 
+
+```{r inter-noticias}
+glm1<- glm(noticias_d~lvl+edad_cat+mujer+tpos+region+zona_u_r+as.numeric(encuesta_a)+redes_d+tele_d,
+           data = df_study1,family = "binomial")
+
+noticias_ed_year <- 
+  glm(noticias_d~lvl*as.numeric(encuesta_a)+edad_cat+mujer+tpos+region+zona_u_r+as.numeric(encuesta_a)+redes_d+tele_d,
+      data = df_study1,family = "binomial")
+
+noticias_age_year <- 
+  glm(noticias_d~lvl+edad_cat*as.numeric(encuesta_a)+mujer+tpos+region+zona_u_r+as.numeric(encuesta_a)+redes_d+tele_d,
+      data = df_study1,family = "binomial")
+
+noticias_sex_year <- 
+  glm(noticias_d~lvl+edad_cat+mujer*as.numeric(encuesta_a)+tpos+region+zona_u_r+as.numeric(encuesta_a)+redes_d+tele_d,
+      data = df_study1,family = "binomial")
+
+noticias_tpos_year <- 
+  glm(noticias_d~lvl+edad_cat+mujer+tpos*as.numeric(encuesta_a)+region+zona_u_r+as.numeric(encuesta_a)+redes_d+tele_d,
+      data = df_study1,family = "binomial")
+
+texreg::knitreg(list(glm1,
+                       noticias_ed_year,
+                       noticias_age_year,
+                       noticias_sex_year,
+                       noticias_tpos_year), 
+                  omit.coef = omit.coef)
+```
+
+
+```{r, fig.width=8, fig.height=6}
+texreg::plotreg(l = list(noticias_ed_year,
+                         noticias_age_year,
+                         noticias_sex_year,
+                         noticias_tpos_year), 
+                omit.coef = omit.coef)
 ```
 
 

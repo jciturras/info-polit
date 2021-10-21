@@ -63,50 +63,12 @@ pacman::p_load(dplyr,       # Manipulacion de datos
 Para este ejemplo se va utilizar una base de datos longitudinal de ELSOC para las olas 2016, 2017, 2018 y 2019. Emplearemos un enlace directo para descargar la base de datos desde dataverse:
 
 ```{r}
-load(url("https://dataverse.harvard.edu/api/access/datafile/4606527"))
+load(file = "../input/data/original/base_determinantes_v2.Rdata")
 ```
 
 ### Selección de variables
 
-```{r}
-elsoc_wide <- 
-  elsoc_wide_2016_2019 %>%  #filtrar atrición entre 2016-19 y casos c/inconsistencias mayores
-  dplyr::filter(tipo_atricion==1 & tipo_caso !=2) %>% 
-  dplyr::select(
-    idencuesta, #identificador individual
-    ponderador01_w01,ponderador01_w02,ponderador01_w03,ponderador01_w04, #ponderador población
-    ponderador02_w01,ponderador02_w02,ponderador02_w03,ponderador02_w04, #ponderador sexo
-    m0_sexo_w01,m0_sexo_w02,m0_sexo_w03,m0_sexo_w04, #sexo
-    m0_edad_w01,m0_edad_w02,m0_edad_w03,m0_edad_w04, #edad
-    m01_w01,m01_w02,m01_w03,m01_w04,                 #nivel de educación
-    d01_01_w01,d01_01_w02,d01_01_w03,d01_01_w04      #estatus social subjetivo
-  )
-```
 
-## Transformar base de datos de wide a long
-
-Antes de trasformar la base de datos de wide a long, se debe tener claro el nombre de la etiqueta de periodo asociada a cada variable. En este caso, como se indicó, dicha etiqueta es el sufijo "_w0", habiendo cuatro casos asociados a cada ola: "_w01", "_w02", "_w03" y "_w04". Estos corresponden al años 2016, 2017, 2018 y 2019, respectivamente. Teniendo esta información clara se puede completar los argumentos de la función `long_panel` del paquete `panelr`. Para mayor información del uso de `long_panel` visitar el [link](https://rdrr.io/cran/panelr/man/long_panel.html).
-
-```{r Transformar bbdd de wide a long}
-elsoc_long <- 
-  panelr::long_panel(
-    data = elsoc_wide,#base de datos formato wide
-    prefix = "_w0",   #caracteres antes de la etiqueta de cada ola
-    begin = 1,       #etiqueta de la primera ola
-    end = 4,         #etiqueta de la última ola
-    label_location = "end", #indica donde se localiza la etiqueta asociada a la ola
-    id = "idencuesta", #indica identificador individual
-    wave = "ola")     #nombre que tomará la variable que indica periodo. 
-```
-
-Finalmente, filtramos la base de datos long de casos perdidos.
-
-```{r Recode de casos perdidos en NA}
-elsoc_long[elsoc_long==-999 | elsoc_long==-888] <- NA #recodificar No sabe y No responde en NA
-sum(is.na(elsoc_long)) #indica cantidad de NA
-elsoc_long <- na.omit(elsoc_long) #filtrar NA de la BBDD
-sum(is.na(elsoc_long)) #indica cantidad de NA
-```
 
 # Preparación
 
@@ -125,91 +87,112 @@ En esta sección se realizará la preparación de datos. Se sugiere seguir los s
 ### Ola de medición
 
 ```{r}
-sjmisc::frq(elsoc_long$ola)
-elsoc_long$ola <- factor(elsoc_long$ola,labels = c('2016', '2017', '2018', '2019'),ordered = T)
-elsoc_long$ola <- sjlabelled::set_label(elsoc_long$ola, label = c("Ola de Medición"))
-sjmisc::frq(elsoc_long$ola)
+sjmisc::frq(datos_media$encuesta_a)
+datos_media$encuesta_a <- to_factor(datos_media$encuesta_a)
+sjmisc::frq(datos_media$encuesta_a)
 ```
 
-### Edad
+
+### Mes de medición
+```{r}
+sjmisc::frq(datos_media$encuesta_m)
+datos_media$encuesta_m <- to_factor(datos_media$encuesta_m)
+sjmisc::frq(datos_media$encuesta_m)
+```
+
+### Edad tramos
 
 ```{r}
 #Recode variable "m0_edad" / rename "edad"
-sjmisc::descr(elsoc_long$m0_edad)
-elsoc_long$edad <- factor(car::recode(elsoc_long$m0_edad, "18:29=1;30:49=2;50:64=3;65:150=4"),
+sjmisc::frq(datos_media$edad)
+datos_media$edad_cat <- factor(car::recode(datos_media$edad, "18:29=1;30:49=2;50:64=3;65:150=4"),
                            labels = c('18-29', '30-49', '50-64', '65 o más'))
-elsoc_long$edad <- sjlabelled::set_label(elsoc_long$edad, label = c("Edad en Tramos")) 
-sjmisc::frq(elsoc_long$edad)
+datos_media$edad_cat <- sjlabelled::set_label(datos_media$edad_cat, 
+                                              label = c("Edad en Tramos")) 
+sjmisc::frq(datos_media$edad_cat)
 ```
+
 ### Sexo
 
 ```{r}
 #Recode variable "m0_sexo" / rename "sexo".
-sjmisc::frq(elsoc_long$m0_sexo)
-elsoc_long$sexo <- factor(elsoc_long$m0_sexo,labels = c('Hombre', 'Mujer'))
-elsoc_long$sexo <- sjlabelled::set_label(elsoc_long$sexo, label = c("Tipo de sexo"))
-sjmisc::frq(elsoc_long$sexo)
+sjmisc::frq(datos_media$mujer)
+datos_media$mujer <- to_factor(datos_media$mujer)
+datos_media$mujer <- sjlabelled::set_label(datos_media$mujer, 
+                                           label = c("Sexo (mujer)"))
+sjmisc::frq(datos_media$mujer)
 ```
 
 ### Nivel educacional
 
 ```{r}
-#Recode variable "m01" nivel educacional / rename "educacion"
-sjmisc::frq(elsoc_long$m01)
-elsoc_long$educacion <- car::recode(elsoc_long$m01,"c(1,2,3)=1;c(4,5)=2;c(6,7)=3;c(8,9,10)=4")
-elsoc_long$educacion <- factor(elsoc_long$educacion,labels = c("Basica","Media","Tecnica","Universitaria"))
-elsoc_long$educacion <- sjlabelled::set_label(elsoc_long$educacion, label = c("Nivel Educacional"))
-sjmisc::frq(elsoc_long$educacion)
+sjmisc::frq(datos_media$lvl)
+datos_media$lvl <- to_factor(datos_media$lvl)
+datos_media$lvl <- sjlabelled::set_label(datos_media$lvl, 
+                                         label = c("Nivel Educacional (tramos)"))
+sjmisc::frq(datos_media$lvl)
 ```
-
-### Estatus subjetivo
-
-**Categórica**
 
 ```{r}
-#Variable "d01_01" estatus social subjetivo / rename "estatus".
-sjmisc::frq(elsoc_long$d01_01)
-elsoc_long$estatus <- elsoc_long$d01_01
-elsoc_long$estatus <- car::recode(elsoc_long$estatus,"c(0,1,2)=1;c(3,4)=2;c(5,6)=3;c(7,8)=4;c(9,10,11)=5") 
-elsoc_long$estatus <- factor(elsoc_long$estatus,levels = 1:5,c("Bajo","Medio bajo","Medio","Medio alto","Alto"))
-elsoc_long$estatus <- sjlabelled::set_label(elsoc_long$estatus, label = c("Estatus Social Subjetivo")) 
-sjmisc::frq(elsoc_long$estatus)
+sjmisc::frq(datos_media$region)
+datos_media$region <- to_factor(datos_media$region)
+sjmisc::frq(datos_media$region)
 ```
 
-**Numérica**
+# Variables agregadas
+
+## Consumo información (factorial)
+```{r}
+# correlacion
+cor(datos_media %>% 
+      select(redes,tele,noticias)) %>% 
+  corrplot::corrplot.mixed()
+
+#factorial
+fa_1   <- psych::fa(r = select(datos_media ,redes,tele,noticias))
+factor1<- psych::factor.scores(select(datos_media ,redes,tele,noticias), 
+                     fa_1, Phi = NULL, 
+              method = c("Bartlett"),
+              rho=NULL,impute="none")
+datos_media$media_fs<- factor1$scores[,1] 
+datos_media$media_fs <- sjlabelled::set_label(datos_media$media_fs, 
+                                         label = c("Consumo de información política (scores)"))
+sjmisc::frq(datos_media$media_fs)
+hist.default(datos_media$media_fs)
+```
+
+## Consumo información (promedio)
 
 ```{r}
-#Variable "d01_01" estatus social subjetivo / rename "estatus".
-sjmisc::frq(elsoc_long$d01_01)
-elsoc_long$ess <- elsoc_long$d01_01
-elsoc_long$ess <- remove_labels(elsoc_long$ess,labels = c(1,2))
-elsoc_long$ess <- sjlabelled::set_label(elsoc_long$ess, label = c("Estatus Social Subjetivo (c)")) 
-sjmisc::frq(elsoc_long$ess)
+datos_media$media_avg <- 
+  sjmisc::row_means(x = select(datos_media,redes,tele,noticias),
+                               n = 1,var = "media_avg",append = F)$media_avg
+datos_media$media_avg <- 
+  sjlabelled::set_label(datos_media$media_avg ,
+                        label = c("Consumo de información política (promedio)"))
+
+sjmisc::frq(datos_media$media_avg)
+hist.default(datos_media$media_avg)
 ```
+
 
 # Seleccionar variables
 
 ```{r}
-df_final<- 
-  elsoc_long %>%
-  dplyr::select(ola,
-                edad,
-                sexo,
-                educacion,
-                estatus,
-                ess)
+df_study1<- 
+  datos_media 
 ```
 
 # Resumen 
 
 ```{r,results='asis', echo=FALSE}
-sjPlot::view_df(df_final)
+sjPlot::view_df(df_study1,show.type = T)
 ```
 
 # Guardar datos
 
 ```{r}
-save(df_final,file = "../input/data/proc/df_final.Rdata")
+save(df_study1,file = "../input/data/proc/df_study1.Rdata")
 ```
 
 
