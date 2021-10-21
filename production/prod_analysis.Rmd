@@ -358,7 +358,7 @@ texreg::knitreg(list(glm1,
                   omit.coef = omit.coef)
 ```
 
-```{r, fig.width=8, fig.height=6}
+```{r, fig.width=8, fig.height=8}
 texreg::plotreg(l = list(redes_ed_year,
                          redes_age_year,
                          redes_sex_year,
@@ -398,7 +398,7 @@ texreg::knitreg(list(glm1,
                   omit.coef = omit.coef)
 ```
 
-```{r, fig.width=8, fig.height=6}
+```{r, fig.width=8, fig.height=8}
 texreg::plotreg(l = list(tele_ed_year,
                          tele_age_year,
                          tele_sex_year,
@@ -438,7 +438,7 @@ texreg::knitreg(list(glm1,
 ```
 
 
-```{r, fig.width=8, fig.height=6}
+```{r, fig.width=8, fig.height=8}
 texreg::plotreg(l = list(noticias_ed_year,
                          noticias_age_year,
                          noticias_sex_year,
