@@ -1,0 +1,178 @@
+---
+title: "Preparación de datos"
+subtitle: "Study 2"
+date: "`r format(Sys.time(), '%A %d %B %Y %X')`"
+output: 
+  html_document: 
+    toc: yes
+    toc_float:
+      collapsed: yes
+      smooth_scroll: no
+      number_sections: yes
+    code_folding: show  
+    number_sections: yes
+editor_options: 
+  chunk_output_type: console
+---
+
+# Setup
+
+```{r setup}
+knitr::opts_chunk$set(warning = FALSE, 
+                      message = FALSE, 
+                      echo = TRUE 
+                      )
+options(scipen=9999) # desactivar notacion cientifica
+remove(list = ls()) #limpieza del entorno de trabajo
+```
+
+```{css, echo=FALSE}
+# /* expandir el espacio del documento*/
+body .main-container {
+      max-width: 1600px !important;
+      width: 1600px !important;
+    }
+#/* expandir width de la TOC*/
+div.tocify {
+    width: 22% !important;
+    max-width: 331px !important;
+    max-height: 102% !important;
+}
+```
+
+## Librerías
+
+```{r}
+if (!require("pacman")) install.packages("pacman") # instalar pacman
+                            # cargar librerias
+pacman::p_load(dplyr,       # Manipulacion de datos 
+               car,         # recodificar variables
+               sjlabelled,  # etiquetado de variables
+               sjmisc,      # descriptivos y frecuencias
+               sjPlot,      # tablas, plots y descriptivos
+               summarytools,# resumen de dataframe
+               panelr,      # datos panel 
+               stringr,     # manejo de vector de caracteres
+               survey,      # diseno muestral complejo
+               ggrepel,     # etiquetas en ggplo2
+               tidyverse    # ggplot2 + librerias complementarias
+               )
+```
+
+## Datos
+
+Para este ejemplo se va utilizar una base de datos longitudinal de ELSOC para las olas 2016, 2017, 2018 y 2019. Emplearemos un enlace directo para descargar la base de datos desde dataverse:
+
+```{r}
+datos_media<- haven::read_dta(file = "../input/data/original/1990_2021_r.dta")
+```
+
+### Selección de variables
+
+
+
+# Preparación
+
+En esta sección se realizará la preparación de datos. Se sugiere seguir los siguientes pasos para cada variable:
+
+| Paso                      | Función                         |
+|---------------------------|---------------------------------|
+| 1. Descriptivo inicial    | sjmisc::frq() o sjmisc::descr() |
+| 2. Recodificación         | car::recode()                   |
+| 3. Etiquetado de valores  | sjlabelled::set_labels()        |
+| 4. Etiquetado de variable | sjlabelled::set_label()         |
+| 5. Descriptivo final      | sjmisc::frq o sjmisc::descr()   |
+
+## Variables 
+
+### Ola de medición
+
+```{r}
+sjmisc::frq(datos_media$encuesta_a)
+datos_media$encuesta_a <- to_factor(datos_media$encuesta_a)
+sjmisc::frq(datos_media$encuesta_a)
+```
+
+
+### Mes de medición
+```{r}
+sjmisc::frq(datos_media$encuesta_m)
+datos_media$encuesta_m <- to_factor(datos_media$encuesta_m)
+sjmisc::frq(datos_media$encuesta_m)
+```
+
+### Edad tramos
+
+```{r}
+#Recode variable "m0_edad" / rename "edad"
+sjmisc::frq(datos_media$edad)
+datos_media$edad_cat <- factor(car::recode(datos_media$edad, "18:29=1;30:49=2;50:64=3;65:150=4"),
+                           labels = c('18-29', '30-49', '50-64', '65 o más'))
+datos_media$edad_cat <- sjlabelled::set_label(datos_media$edad_cat, 
+                                              label = c("Edad en Tramos")) 
+sjmisc::frq(datos_media$edad_cat)
+```
+
+### Sexo
+
+```{r}
+#Recode variable "m0_sexo" / rename "sexo".
+sjmisc::frq(datos_media$mujer)
+datos_media$mujer <- to_factor(datos_media$mujer)
+datos_media$mujer <- sjlabelled::set_label(datos_media$mujer, 
+                                           label = c("Sexo (mujer)"))
+sjmisc::frq(datos_media$mujer)
+```
+
+### Nivel educacional A
+
+```{r}
+sjmisc::frq(datos_media$a_educ)
+datos_media$a_educ <- to_factor(datos_media$a_educ)
+datos_media$a_educ <- sjlabelled::set_label(datos_media$a_educ, 
+                                         label = c("Nivel Educacional (tramos) - 94 a 19"))
+sjmisc::frq(datos_media$a_educ)
+```
+
+### Nivel educacional B
+
+```{r}
+sjmisc::frq(datos_media$b_educ)
+datos_media$b_educ <- to_factor(datos_media$b_educ)
+datos_media$b_educ <- sjlabelled::set_label(datos_media$b_educ, 
+                                         label = c("Nivel Educacional (tramos) - 90 a 19"))
+sjmisc::frq(datos_media$b_educ)
+```
+
+
+### Años de educación
+```{r}
+sjmisc::frq(datos_media$esc)
+datos_media$educ <- as.numeric(car::recode(datos_media$esc, "27:99=NA"))
+datos_media$educ <- sjlabelled::set_label(datos_media$educ, 
+                                         label = c("Años de educación"))
+sjmisc::frq(datos_media$educ)
+```
+
+
+# Seleccionar variables
+
+```{r}
+df_study2<- 
+  datos_media 
+```
+
+# Resumen 
+
+```{r,results='asis', echo=FALSE}
+sjPlot::view_df(df_study2,show.type = T,show.prc = T)
+```
+
+# Guardar datos
+
+```{r}
+save(df_study2,file = "../input/data/proc/df_study2.Rdata")
+```
+
+
+

@@ -1,0 +1,593 @@
+---
+title: "Análisis de datos"
+subtitle: "Study 2"
+date: "`r format(Sys.time(), '%A %d %B %Y %X')`"
+output:
+  html_document:
+    toc: yes
+    code_folding: hide
+    toc_float:
+      collapsed: yes
+      smooth_scroll: no
+      number_sections: yes
+editor_options:
+  chunk_output_type: console
+---
+
+```{r eval=FALSE, include=FALSE}
+rmarkdown::render("production/prod_analysis-study2.Rmd", output_format = "html_document")
+```
+
+
+# Setup
+
+```{r setup}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE,
+	cache =TRUE
+)
+options(scipen=9999) # desactivar notacion cientifica
+```
+
+```{css, echo=FALSE}
+# /* expandir el espacio del documento*/
+body .main-container {
+      max-width: 1600px !important;
+      width: 1600px !important;
+    }
+
+#/* expandir width de la TOC*/
+div.tocify {
+    width: 22% !important;
+    max-width: 331px !important;
+    max-height: 102% !important;
+}
+```
+
+
+## Librerías
+
+```{r}
+ if (!require("pacman")) install.packages("pacman") # instalar pacman
+ pacman::p_load(dplyr,       # Manipulacion de datos
+               haven,       # importar datos en .dta o .sav
+               sjmisc,      # descriptivos y frecuencias
+               sjPlot,      # tablas, plots y descriptivos
+               summarytools,# resumen de dataframe
+               texreg,      # tablas de regresion
+               knitr,       # tablas kable
+               kableExtra,  # tablas kable personalizadas
+               ggplot2,     # plots
+               lme4,
+               estimatr
+               )
+```
+
+## Datos
+```{r}
+ load(file = "../input/data/proc/df_study2.Rdata")
+```
+
+# Análisis
+
+
+```{r}
+ names(df_study2)
+```
+
+## Modelos lineales
+
+```{r tele-lineal, echo=TRUE, cache=TRUE, results='asis'}
+ rob1<- lm_robust(tele~b_educ+edad_cat+mujer+tpos+encuesta_a,data = df_study2)
+ rob2<- lm_robust(tele~b_educ+edad_cat+mujer+tpos,data = df_study2,fixed_effects = encuesta_a)
+ ml0 <- lmer(tele~1+(1|encuesta_a),data = df_study2)
+ ml1 <- lmer(tele~b_educ+edad_cat+mujer+tpos+(1|encuesta_a),data = df_study2)
+ ml2 <- lmer(tele~b_educ+edad_cat+mujer+tpos+(1+b_educ|encuesta_a),data = df_study2)
+ ml3 <- lmer(tele~esc+edad_cat+mujer+tpos+(1|encuesta_a),data = df_study2)
+ ml4 <- lmer(tele~esc+edad_cat+mujer+tpos+(1+esc|encuesta_a),data = df_study2)
+
+
+cap <- "Modelos de regresión con efectos fijos y multinivel para consumo de información política en Televisión" # Titulo de tabla
+custom.coef.names = c( # Custom names para coeficientes:
+  "Media",
+  "Técnico-profesional",
+  "Univesitaria",
+  "30-49",
+  "50-64",
+  "65 o más",
+  "Sexo: mujer",
+  "Tiene pos. política (ref: no tiene)",
+  "Encuesta: 1993",
+  "Encuesta: 1994",
+  "Encuesta: 1995",
+  "Encuesta: 1996",
+  "Encuesta: 1997",
+  "Encuesta: 1998",
+  "Encuesta: 1999",
+  "Encuesta: 1990",
+  "Encuesta: 1991",
+  "Encuesta: 2002",
+  "Encuesta: 2003",
+  "Encuesta: 2004",
+  "Encuesta: 2005",
+  "Encuesta: 2006",
+  "Encuesta: 2007",
+  "Encuesta: 2008",
+  "Encuesta: 2009",
+  "Encuesta: 2010",
+  "Encuesta: 2011",
+  "Encuesta: 2012",
+  "Encuesta: 2013",
+  "Encuesta: 2014",
+  "Encuesta: 2015",
+  "Encuesta: 2016",
+  "Encuesta: 2017",
+  "Encuesta: 2018",
+  "Encuesta: 2019",
+  "Años de escolaridad"
+  )
+ # Custom footnote de tabla:
+ custom.note = "$^{***}$p < 0,001;$^{**}$p < 0,01;$^{*}$p < 0,05"
+ omit.coef="((Intercept))"
+ # texreg::knitreg() decide si usar formato tabla html o latex según corresponda.
+texreg::knitreg(list(rob1,rob2,ml1,ml2,ml3,ml4),
+                omit.coef = omit.coef,
+                include.ci = FALSE,
+                caption = cap,                          # Titulo
+                caption.above = T,                      # Titulo de tabla arriba
+                custom.coef.names = custom.coef.names,  # Definir custom names para coeficientes
+                custom.note = custom.note,              # Definir footnote de tabla
+                booktabs = TRUE,                        # Usar líneas horizontales en tabla
+                float.pos = "hp!"
+                )
+```
+
+
+
+
+```{r, fig.width=12, fig.height=5}
+sjPlot::plot_model(model = ml2,type = "re",title = "Random slope nivel educacional")
+sjPlot::plot_model(model = ml3,type = "re",title = "Años de educación")
+```
+
+```{r echo=TRUE}
+anova(ml1,ml2) %>%
+  broom::tidy() %>%
+  knitr::kable() %>%
+  kableExtra::kable_classic()
+
+anova(ml3,ml4) %>%
+  broom::tidy() %>%
+  knitr::kable() %>%
+  kableExtra::kable_classic()
+```
+
+```{r noticias-lineal, echo=TRUE, cache=TRUE, results='asis'}
+rob1<- lm_robust(noticias~b_educ+edad_cat+mujer+tpos+encuesta_a,data = df_study2)
+rob2<- lm_robust(noticias~b_educ+edad_cat+mujer+tpos,data = df_study2,fixed_effects = encuesta_a)
+ml0 <- lmer(noticias~1+(1|encuesta_a),data = df_study2)
+ml1 <- lmer(noticias~b_educ+edad_cat+mujer+tpos+(1|encuesta_a),data = df_study2)
+ml2 <- lmer(noticias~b_educ+edad_cat+mujer+tpos+(1+b_educ|encuesta_a),data = df_study2)
+ml3 <- lmer(noticias~esc+edad_cat+mujer+tpos+(1|encuesta_a),data = df_study2)
+ml4 <- lmer(noticias~esc+edad_cat+mujer+tpos+(1+esc|encuesta_a),data = df_study2)
+
+
+cap <- "Modelos de regresión con efectos fijos y multinivel para consumo de información política en Noticias" # Titulo de tabla
+custom.coef.names = c( # Custom names para coeficientes:
+  "Media",
+  "Técnico-profesional",
+  "Univesitaria",
+  "30-49",
+  "50-64",
+  "65 o más",
+  "Sexo: mujer",
+  "Tiene pos. política (ref: no tiene)",
+  "Encuesta: 1993",
+  "Encuesta: 1994",
+  "Encuesta: 1995",
+  "Encuesta: 1996",
+  "Encuesta: 1997",
+  "Encuesta: 1998",
+  "Encuesta: 1999",
+  "Encuesta: 1990",
+  "Encuesta: 1991",
+  "Encuesta: 2002",
+  "Encuesta: 2003",
+  "Encuesta: 2004",
+  "Encuesta: 2005",
+  "Encuesta: 2006",
+  "Encuesta: 2007",
+  "Encuesta: 2008",
+  "Encuesta: 2009",
+  "Encuesta: 2010",
+  "Encuesta: 2011",
+  "Encuesta: 2012",
+  "Encuesta: 2013",
+  "Encuesta: 2014",
+  "Encuesta: 2015",
+  "Encuesta: 2016",
+  "Encuesta: 2017",
+  "Encuesta: 2018",
+  "Encuesta: 2019",
+  "Años de escolaridad"
+  )
+# Custom footnote de tabla:
+custom.note = "$^{***}$p < 0,001;$^{**}$p < 0,01;$^{*}$p < 0,05"
+omit.coef="((Intercept))"
+# texreg::knitreg() decide si usar formato tabla html o latex según corresponda.
+# texreg::knitreg(list(rob1,rob2,ml1,ml2,ml3,ml4))
+texreg::htmlreg(list(rob1,rob2,ml1,ml2,ml3,ml4),
+                omit.coef = omit.coef,
+                include.ci = FALSE,
+                caption = cap,                          # Titulo
+                caption.above = T,                      # Titulo de tabla arriba
+                custom.coef.names = custom.coef.names,  # Definir custom names para coeficientes
+                custom.note = custom.note,              # Definir footnote de tabla
+                booktabs = TRUE,                        # Usar líneas horizontales en tabla
+                scalebox = 0.75,                        # tamaño de tabla a .75
+                float.pos = "hp!"
+                )
+```
+
+```{r, fig.width=12, fig.height=5}
+sjPlot::plot_model(model = ml2,type = "re",title = "Random slope nivel educacional")
+sjPlot::plot_model(model = ml3,type = "re",title = "Años de educación")
+```
+
+```{r}
+anova(ml1,ml2) %>%
+  broom::tidy() %>%
+  knitr::kable() %>%
+  kableExtra::kable_classic()
+
+anova(ml3,ml4) %>%
+  broom::tidy() %>%
+  knitr::kable() %>%
+  kableExtra::kable_classic()
+```
+
+
+## Modelos logit
+
+```{r tele, echo=TRUE, cache=TRUE, results='asis'}
+# Modelos para ve television (binary)
+glm1<- glm(factor(tele_d)~b_educ+edad_cat+mujer+tpos+encuesta_a+noticias_d,
+           data = df_study2,family = "binomial")
+glmer0 <- glmer(factor(tele_d)~1+(1|encuesta_a),
+                data = df_study2,family = "binomial",nAGQ = 10)
+glmer1 <- glmer(factor(tele_d)~b_educ+edad_cat+mujer+tpos+noticias_d+(1|encuesta_a),
+                data = df_study2,family = "binomial",nAGQ = 10)
+glmer2 <- glmer(factor(tele_d)~b_educ+edad_cat+mujer+tpos+noticias_d+(1+b_educ|encuesta_a),
+                data = df_study2,family = "binomial")
+glmer3 <- glmer(factor(tele_d)~educ+edad_cat+mujer+tpos+noticias_d+(1|encuesta_a),
+                data = df_study2,family = "binomial")
+glmer4 <- glmer(factor(tele_d)~educ+edad_cat+mujer+tpos+noticias_d+(1+educ|encuesta_a),
+                data = df_study2,family = "binomial")
+
+cap <- "Modelos de regresión logit y logit multinivel para consumo de información política en Televisión" # Titulo de tabla
+custom.coef.names = c( # Custom names para coeficientes:
+  "Media",
+  "Técnico-profesional",
+  "Univesitaria",
+  "30-49",
+  "50-64",
+  "65 o más",
+  "Sexo: mujer",
+  "Tiene pos. política (ref: no tiene)",
+  "Encuesta: 1993",
+  "Encuesta: 1994",
+  "Encuesta: 1995",
+  "Encuesta: 1996",
+  "Encuesta: 1997",
+  "Encuesta: 1998",
+  "Encuesta: 1999",
+  "Encuesta: 1990",
+  "Encuesta: 1991",
+  "Encuesta: 2002",
+  "Encuesta: 2003",
+  "Encuesta: 2004",
+  "Encuesta: 2005",
+  "Encuesta: 2006",
+  "Encuesta: 2007",
+  "Encuesta: 2008",
+  "Encuesta: 2009",
+  "Encuesta: 2010",
+  "Encuesta: 2011",
+  "Encuesta: 2012",
+  "Encuesta: 2013",
+  "Encuesta: 2014",
+  "Encuesta: 2015",
+  "Encuesta: 2016",
+  "Encuesta: 2017",
+  "Encuesta: 2018",
+  "Encuesta: 2019",
+  "Años de escolaridad"
+  )
+
+# Custom footnote de tabla:
+custom.note = "$^{***}$p < 0,001;$^{**}$p < 0,01;$^{*}$p < 0,05"
+omit.coef="((Intercept))|(region)|(zona_u_r)|(redes_d)|(noticias_d)"
+# texreg::knitreg() decide si usar formato tabla html o latex según corresponda.
+texreg::knitreg(list(glm1,glmer1,glmer2,glmer3,glmer4))
+texreg::knitreg(list(glm1,glmer1,glmer2,glmer3),
+                omit.coef = omit.coef,
+                include.ci = FALSE,
+                caption = cap,                          # Titulo
+                caption.above = T,                      # Titulo de tabla arriba
+                custom.coef.names = custom.coef.names,  # Definir custom names para coeficientes
+                custom.note = custom.note,              # Definir footnote de tabla
+                booktabs = TRUE,                        # Usar líneas horizontales en tabla
+                scalebox = 0.75,                        # tamaño de tabla a .75
+                float.pos = "hp!"
+                )
+```
+
+```{r}
+anova(glmer1,glmer2) %>%
+  broom::tidy() %>%
+  knitr::kable() %>%
+  kableExtra::kable_classic()
+
+anova(glmer3,glmer4) %>%
+  broom::tidy() %>%
+  knitr::kable() %>%
+  kableExtra::kable_classic()
+```
+
+```{r, fig.width=12, fig.height=5}
+sjPlot::plot_model(model = glmer2,type = "re",
+                   title = "Televisión: Random slope nivel educacional")
+sjPlot::plot_model(model = glmer4,type = "re",
+                   title = "Televisión: Random slope años de educación")
+```
+
+```{r noticias, results='asis', cache=T}
+# Modelos para lee noticias (binary)
+glm1<- glm(factor(noticias_d)~b_educ+edad_cat+mujer+tpos+encuesta_a+tele_d,
+           data = df_study2,family = "binomial")
+glmer0 <- glmer(factor(noticias_d)~1+(1|encuesta_a),
+                data = df_study2,family = "binomial",nAGQ = 10)
+glmer1 <- glmer(factor(noticias_d)~b_educ+edad_cat+mujer+tpos+tele_d+(1|encuesta_a),
+                data = df_study2,family = "binomial",nAGQ = 10)
+glmer2 <- glmer(factor(noticias_d)~b_educ+edad_cat+mujer+tpos+tele_d+(1+b_educ|encuesta_a),
+                data = df_study2,family = "binomial")
+glmer3 <- glmer(factor(noticias_d)~educ+edad_cat+mujer+tpos+tele_d+(1|encuesta_a),
+                data = df_study2,family = "binomial")
+glmer4 <- glmer(factor(noticias_d)~educ+edad_cat+mujer+tpos+tele_d+(1+educ|encuesta_a),
+                data = df_study2,family = "binomial")
+
+cap <- "Modelos de regresión logit y logit multinivel para consumo de información política Lectura de noticias" # Titulo de tabla
+custom.coef.names = c( # Custom names para coeficientes:
+  "Media",
+  "Técnico-profesional",
+  "Univesitaria",
+  "30-49",
+  "50-64",
+  "65 o más",
+  "Sexo: mujer",
+  "Tiene pos. política (ref: no tiene)",
+  "Encuesta: 1993",
+  "Encuesta: 1994",
+  "Encuesta: 1995",
+  "Encuesta: 1996",
+  "Encuesta: 1997",
+  "Encuesta: 1998",
+  "Encuesta: 1999",
+  "Encuesta: 1990",
+  "Encuesta: 1991",
+  "Encuesta: 2002",
+  "Encuesta: 2003",
+  "Encuesta: 2004",
+  "Encuesta: 2005",
+  "Encuesta: 2006",
+  "Encuesta: 2007",
+  "Encuesta: 2008",
+  "Encuesta: 2009",
+  "Encuesta: 2010",
+  "Encuesta: 2011",
+  "Encuesta: 2012",
+  "Encuesta: 2013",
+  "Encuesta: 2014",
+  "Encuesta: 2015",
+  "Encuesta: 2016",
+  "Encuesta: 2017",
+  "Encuesta: 2018",
+  "Encuesta: 2019",
+  "Años de escolaridad"
+  )
+
+
+# Custom footnote de tabla:
+custom.note = "$^{***}$p < 0,001;$^{**}$p < 0,01;$^{*}$p < 0,05"
+omit.coef="((Intercept))|(region)|(zona_u_r)|(redes_d)|(tele_d)"
+# texreg::knitreg() decide si usar formato tabla html o latex según corresponda.
+texreg::knitreg(list(glm1,glmer1,glmer2,glmer3),
+                omit.coef = omit.coef,
+                include.ci = FALSE,
+                caption = cap,                          # Titulo
+                caption.above = T,                      # Titulo de tabla arriba
+                custom.coef.names = custom.coef.names,  # Definir custom names para coeficientes
+                custom.note = custom.note,              # Definir footnote de tabla
+                booktabs = TRUE,                        # Usar líneas horizontales en tabla
+                scalebox = 0.75,                        # tamaño de tabla a .75
+                float.pos = "hp!"
+                )
+```
+
+```{r}
+ anova(glmer1,glmer2) %>%
+     broom::tidy() %>%
+     knitr::kable() %>%
+   kableExtra::kable_classic()
+
+ anova(glmer3,glmer4) %>%
+     broom::tidy() %>%
+     knitr::kable() %>%
+   kableExtra::kable_classic()
+```
+
+```{r, fig.width=12, fig.height=5}
+sjPlot::plot_model(model = glmer2,type = "re",
+                   title = "Noticias: Random slope nivel educacional")
+sjPlot::plot_model(model = glmer4,type = "re",
+                   title = "Noticias: Random slope años de educación")
+```
+
+
+# Interacciones
+## Televisión
+
+```{r inter-tele, results='asis'}
+ glm1<- glm(factor(tele_d)~b_educ+edad_cat+mujer+tpos+as.numeric(encuesta_a)+noticias_d,
+            data = df_study2,family = "binomial")
+
+ tele_ed_year <-
+   glm(factor(tele_d)~b_educ*as.numeric(encuesta_a)+edad_cat+mujer+tpos+as.numeric(encuesta_a)+noticias_d,
+       data = df_study2,family = "binomial")
+
+ tele_age_year <-
+   glm(factor(tele_d)~b_educ+edad_cat*as.numeric(encuesta_a)+mujer+tpos+as.numeric(encuesta_a)+noticias_d,
+       data = df_study2,family = "binomial")
+
+ tele_sex_year <-
+   glm(factor(tele_d)~b_educ+edad_cat+mujer*as.numeric(encuesta_a)+tpos+as.numeric(encuesta_a)+noticias_d,
+       data = df_study2,family = "binomial")
+
+ tele_tpos_year <-
+   glm(factor(tele_d)~b_educ+edad_cat+mujer+tpos*as.numeric(encuesta_a)+as.numeric(encuesta_a)+noticias_d,
+       data = df_study2,family = "binomial")
+
+cap <- "Modelos de regresión logit para consumo de información política en Televisión" # Titulo de tabla
+custom.coef.names = c( # Custom names para coeficientes:
+  "Media",
+  "Técnico-profesional",
+  "Univesitaria",
+  "30-49",
+  "50-64",
+  "65 o más",
+  "Sexo: mujer",
+  "Tiene pos. política (ref: no tiene)",
+  "Año",
+  "Media x Año",
+  "Técnico-profesional x Año",
+  "Univesitaria x Año",
+  "30-49 x Año",
+  "50-64 x Año",
+  "65 o más x Año",  
+  "Sexo: mujer x Año",
+  "Tiene pos. pol. x Año"
+  )
+
+
+# Custom footnote de tabla:
+custom.note = "$^{***}$p < 0,001;$^{**}$p < 0,01;$^{*}$p < 0,05"
+omit.coef="((Intercept))|(region)|(zona_u_r)|(noticias_d)" 
+ texreg::knitreg(list(glm1,
+                        tele_ed_year,
+                        tele_age_year,
+                        tele_sex_year,
+                        tele_tpos_year),
+                omit.coef = omit.coef,
+                include.ci = FALSE,
+                caption = cap,                          # Titulo
+                caption.above = T,                      # Titulo de tabla arriba
+                custom.coef.names = custom.coef.names,  # Definir custom names para coeficientes
+                custom.note = custom.note,              # Definir footnote de tabla
+                booktabs = TRUE,                        # Usar líneas horizontales en tabla
+                scalebox = 0.75,                        # tamaño de tabla a .75
+                float.pos = "hp!"                
+                 )
+```
+
+```{r, fig.width=8, fig.height=8}
+ texreg::plotreg(l = list(tele_ed_year,
+                          tele_age_year,
+                          tele_sex_year,
+                          tele_tpos_year),
+                 omit.coef = omit.coef)
+```
+
+## Noticias
+
+```{r inter-noticias, results='asis'}
+ glm1<- glm(factor(noticias_d)~b_educ+edad_cat+mujer+tpos+as.numeric(encuesta_a)+tele_d,
+            data = df_study2,family = "binomial")
+
+ noticias_ed_year <-
+   glm(factor(noticias_d)~b_educ*as.numeric(encuesta_a)+edad_cat+mujer+tpos+as.numeric(encuesta_a)+tele_d,
+       data = df_study2,family = "binomial")
+
+ noticias_age_year <-
+   glm(factor(noticias_d)~b_educ+edad_cat*as.numeric(encuesta_a)+mujer+tpos+as.numeric(encuesta_a)+tele_d,
+       data = df_study2,family = "binomial")
+
+ noticias_sex_year <-
+   glm(factor(noticias_d)~b_educ+edad_cat+mujer*as.numeric(encuesta_a)+tpos+as.numeric(encuesta_a)+tele_d,
+       data = df_study2,family = "binomial")
+
+ noticias_tpos_year <-
+   glm(factor(noticias_d)~b_educ+edad_cat+mujer+tpos*as.numeric(encuesta_a)+as.numeric(encuesta_a)+tele_d,
+       data = df_study2,family = "binomial")
+
+cap <- "Modelos de regresión logit para consumo de información política en Lectura" # Titulo de tabla
+custom.coef.names = c( # Custom names para coeficientes:
+  "Media",
+  "Técnico-profesional",
+  "Univesitaria",
+  "30-49",
+  "50-64",
+  "65 o más",
+  "Sexo: mujer",
+  "Tiene pos. política (ref: no tiene)",
+  "Año",
+  "Media x Año",
+  "Técnico-profesional x Año",
+  "Univesitaria x Año",
+  "30-49 x Año",
+  "50-64 x Año",
+  "65 o más x Año",  
+  "Sexo: mujer x Año",
+  "Tiene pos. pol. x Año"
+  )
+
+
+# Custom footnote de tabla:
+custom.note = "$^{***}$p < 0,001;$^{**}$p < 0,01;$^{*}$p < 0,05"
+omit.coef="((Intercept))|(region)|(zona_u_r)|(tele_d)"  
+
+texreg::knitreg(list(glm1,
+                       noticias_ed_year,
+                       noticias_age_year,
+                       noticias_sex_year,
+                       noticias_tpos_year),
+                omit.coef = omit.coef,
+                include.ci = FALSE,
+                caption = cap,                          # Titulo
+                caption.above = T,                      # Titulo de tabla arriba
+                custom.coef.names = custom.coef.names,  # Definir custom names para coeficientes
+                custom.note = custom.note,              # Definir footnote de tabla
+                booktabs = TRUE,                        # Usar líneas horizontales en tabla
+                scalebox = 0.75,                        # tamaño de tabla a .75
+                float.pos = "hp!"                  
+                )
+```
+
+
+```{r, fig.width=8, fig.height=8}
+texreg::plotreg(l = list(noticias_ed_year,
+                         noticias_age_year,
+                         noticias_sex_year,
+                         noticias_tpos_year),
+                omit.coef = omit.coef)
+```
+
+
+* Matías:
+  - Sube base de datos con 54 encuestas (29 años) para televisión y noticias
+  - Replicar análisis previos de interacción
+  - Análisis mulinivel random intercept x año y random slope para educación x año.
+  - Análisis logit: año como moderador de educación, edad, sexo y posición política
+  - Cambiar cat ref de educación (invertir)
+  - fecha lunes
